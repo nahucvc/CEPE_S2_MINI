@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de LED - ESP32</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="contenedor">
+        <h1>Control de LED</h1>
+        <div class="led" id="led"></div>
+        <p class="estado">Estado: <span id="estadoTexto">Desconocido</span></p>
+        <div class="botones">
+            <button id="btnOn" class="btn btn-on">Encender</button>
+            <button id="btnOff" class="btn btn-off">Apagar</button>
+            <button id="btnToggle" class="btn btn-toggle">Alternar</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
