@@ -1,9 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include "servidor.h"
+#include <PWM.h>
 
 const char *ssid = "ESP";
 const char *password = "123456789";
+PWM ledPwm;
 
 void setup() 
 {
@@ -20,6 +22,7 @@ void setup()
  Serial.println(WiFi.localIP());
 
  IniciarServidor();
+ 
 }
 
 

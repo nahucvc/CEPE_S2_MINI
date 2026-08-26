@@ -77,18 +77,74 @@ void IniciarServidor(void)
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, estadoLed);
 
+    // El WebSocket debe registrarse ANTES que los handlers HTTP genéricos,
+    // para que la ruta /ws no sea interceptada por el regex de archivos.
+    ws.onEvent(EventosSockets);
+    server.addHandler(&ws);
+
     // Se enruta las solicitudes del servidor , tambien se puede ver mas tipo de contenido en https://www.iana.org/assignments/media-types/media-types.xhtml
     server.on("/", [](AsyncWebServerRequest *request)
               { request->send(SPIFFS, "/index.html", "text/html"); });
 
-    server.on("/styles.css", [](AsyncWebServerRequest *request)
-              { request->send(SPIFFS, "/styles.css", "text/css"); });
-
-    server.on("/script.js", [](AsyncWebServerRequest *request)
-              { request->send(SPIFFS, "/script.js", "text/javascript"); });
+    // Sirve cualquier archivo de la carpeta data (SPIFFS) con su tipo MIME
+    server.on("^\\/(.*)$", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  String ruta = "/" + request->pathArg(0);
+                  String tipo = "application/octet-stream";
+                  if (ruta.endsWith(".html"))
+                  {
+                      tipo = "text/html";
+                  }
+                  else if (ruta.endsWith(".js"))
+                  {
+                      tipo = "text/javascript";
+                  }
+                  else if (ruta.endsWith(".css"))
+                  {
+                      tipo = "text/css";
+                  }
+                  else if (ruta.endsWith(".svg"))
+                  {
+                      tipo = "image/svg+xml";
+                  }
+                  else if (ruta.endsWith(".png"))
+                  {
+                      tipo = "image/png";
+                  }
+                  else if (ruta.endsWith(".jpg") || ruta.endsWith(".jpeg"))
+                  {
+                      tipo = "image/jpeg";
+                  }
+                  else if (ruta.endsWith(".gif"))
+                  {
+                      tipo = "image/gif";
+                  }
+                  else if (ruta.endsWith(".ico"))
+                  {
+                      tipo = "image/x-icon";
+                  }
+                  else if (ruta.endsWith(".json"))
+                  {
+                      tipo = "application/json";
+                  }
+                  else if (ruta.endsWith(".woff2"))
+                  {
+                      tipo = "font/woff2";
+                  }
+                  else if (ruta.endsWith(".woff"))
+                  {
+                      tipo = "font/woff";
+                  }
+                  else if (ruta.endsWith(".ttf"))
+                  {
+                      tipo = "font/ttf";
+                  }
+                  else if (ruta.endsWith(".txt"))
+                  {
+                      tipo = "text/plain";
+                  }
+                  request->send(SPIFFS, ruta, tipo); });
 
     server.onNotFound(notFound);
-    ws.onEvent(EventosSockets);
-    server.addHandler(&ws);
     server.begin();
 }
