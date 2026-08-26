@@ -20,6 +20,8 @@ function PWM() {
   });
   const [conectado, setConectado] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
+  // Último duty enviado a la ESP32, para evitar paquetes repetidos.
+  const ultimoDutyEnviadoRef = useRef<number>(0);
 
   useEffect(() => {
     const protocolo = window.location.protocol === "https:" ? "wss" : "ws";
@@ -36,6 +38,7 @@ function PWM() {
           const datos = JSON.parse(evento.data);
           if (datos.tipo === "pwm") {
             setEstado(datos);
+            ultimoDutyEnviadoRef.current = datos.duty;
           }
         } catch {
           // Mensaje no JSON (p.ej. estado del LED), se ignora aquí.
@@ -58,6 +61,25 @@ function PWM() {
     };
   }, []);
 
+  // Función periódica: cada 80 ms revisa si la barra de duty cambió
+  // y, de ser así, envía el nuevo valor a la ESP32.
+  useEffect(() => {
+    const intervalo = window.setInterval(() => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+      const dutyActual = estado.duty;
+      if (dutyActual !== ultimoDutyEnviadoRef.current) {
+        ultimoDutyEnviadoRef.current = dutyActual;
+        socket.send(
+          JSON.stringify({ periferico: "pwm", accion: "duty", duty: dutyActual })
+        );
+      }
+    }, 80);
+
+    return () => window.clearInterval(intervalo);
+  }, [estado.duty]);
+
   const enviar = (comando: Record<string, unknown>) => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -75,8 +97,8 @@ function PWM() {
   };
 
   const cambiarDuty = (duty: number) => {
+    // Solo actualiza el estado local; el envío lo hace la función periódica.
     setEstado((prev) => ({ ...prev, duty }));
-    enviar({ accion: "duty", duty });
   };
 
   const alternar = () => {
