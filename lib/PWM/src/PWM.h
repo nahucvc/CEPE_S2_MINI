@@ -82,23 +82,12 @@ public:
      */
     void detenerSecuencia();
 
-    /**
-     * @brief Activa o desactiva la depuración por Serial.
-     *
-     * Cuando está activa, la librería imprime mensajes de diagnóstico
-     * (configuración, inicio de secuencia, cambios de duty, errores).
-     *
-     * @param activar true para activar la depuración, false para desactivarla.
-     */
-    void depurar(bool activar);
-
 private:
     uint8_t _pin;        // Pin de salida PWM
     uint32_t _frecuencia; // Frecuencia en Hz
     uint8_t _resolucion;  // Resolución en bits
     uint32_t _maximo;     // Valor máximo de ciclo de trabajo
     bool _configurado;    // Indica si el PWM fue configurado
-    bool _depurar;        // Indica si la depuración por Serial está activa
 
     // Estado de la secuencia
     const uint32_t *_duties;      // Vector de duties

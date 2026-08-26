@@ -2,7 +2,7 @@
 
 PWM::PWM()
     : _pin(15), _frecuencia(1000), _resolucion(8), _maximo(255), _configurado(false),
-      _depurar(false), _duties(nullptr), _ts(0), _longitud(0), _indice(0),
+      _duties(nullptr), _ts(0), _longitud(0), _indice(0),
       _inicioUs(0), _secuenciaActiva(false), _timer(nullptr)
 {
 }
@@ -32,41 +32,21 @@ void PWM::configurar(uint8_t pin, uint32_t frecuencia, uint8_t resolucion)
     ledcAttachPin(_pin, 0);
 
     _configurado = true;
-
-    if (_depurar)
-    {
-        Serial.printf("[PWM] Configurado: pin=%u freq=%u Hz res=%u bits max=%u\n",
-                       _pin, _frecuencia, _resolucion, _maximo);
-    }
 }
 
 void PWM::escribir(uint32_t valor)
 {
     if (!_configurado)
     {
-        if (_depurar)
-        {
-            Serial.println("[PWM] ERROR: escribir() sin configurar");
-        }
         return;
     }
 
     if (valor > _maximo)
     {
-        if (_depurar)
-        {
-            Serial.printf("[PWM] AVISO: duty %u supera el maximo %u, se limita\n",
-                          valor, _maximo);
-        }
         valor = _maximo;
     }
 
     ledcWrite(0, valor);
-
-    if (_depurar)
-    {
-        Serial.printf("[PWM] escribir duty=%u\n", valor);
-    }
 }
 
 uint32_t PWM::obtenerMaximo() const
@@ -91,11 +71,6 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
 {
     if (!_configurado || duties == nullptr || longitud == 0 || ts == 0)
     {
-        if (_depurar)
-        {
-            Serial.printf("[PWM] ERROR reproducirSecuencia: config=%d duties=%p long=%u ts=%u\n",
-                          _configurado, (const void *)duties, (unsigned)longitud, ts);
-        }
         return;
     }
 
@@ -120,10 +95,6 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
         esp_err_t err = esp_timer_create(&args, &_timer);
         if (err != ESP_OK)
         {
-            if (_depurar)
-            {
-                Serial.printf("[PWM] ERROR creando timer: %d\n", err);
-            }
             _secuenciaActiva = false;
             return;
         }
@@ -137,12 +108,6 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
         periodoUs = ts < 100 ? 100 : ts;
     }
     esp_timer_start_periodic(_timer, periodoUs);
-
-    if (_depurar)
-    {
-        Serial.printf("[PWM] Secuencia iniciada: long=%u ts=%u us timer=%u us\n",
-                      (unsigned)longitud, ts, periodoUs);
-    }
 }
 
 void PWM::actualizar()
@@ -157,11 +122,6 @@ void PWM::actualizar()
     // Aplica todos los duties cuyo instante (indice * ts) ya haya llegado.
     while (_indice < _longitud && transcurrido >= (_indice * _ts))
     {
-        if (_depurar)
-        {
-            Serial.printf("[PWM] t=%u us -> duty[%u]=%u\n",
-                          transcurrido, (unsigned)_indice, _duties[_indice]);
-        }
         escribir(_duties[_indice]);
         _indice++;
     }
@@ -172,10 +132,6 @@ void PWM::actualizar()
     {
         _indice = 0;
         _inicioUs = micros();
-        if (_depurar)
-        {
-            Serial.println("[PWM] Secuencia reiniciada (bucle infinito)");
-        }
     }
 }
 
@@ -184,24 +140,11 @@ bool PWM::secuenciaActiva() const
     return _secuenciaActiva;
 }
 
-void PWM::depurar(bool activar)
-{
-    _depurar = activar;
-    if (_depurar)
-    {
-        Serial.println("[PWM] Depuración activada");
-    }
-}
-
 void PWM::detenerSecuencia()
 {
     if (_timer != nullptr)
     {
         esp_timer_stop(_timer);
-    }
-    if (_depurar && _secuenciaActiva)
-    {
-        Serial.println("[PWM] Secuencia detenida manualmente");
     }
     _secuenciaActiva = false;
     _duties = nullptr;

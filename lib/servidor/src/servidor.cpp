@@ -195,9 +195,6 @@ void IniciarServidor(void)
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, estadoLed);
 
-    // Activa la depuración de la librería PWM por Serial.
-    pwm.depurar(true);
-
     // El WebSocket debe registrarse ANTES que los handlers HTTP genéricos,
     // para que la ruta /ws no sea interceptada por el regex de archivos.
     ws.onEvent(EventosSockets);

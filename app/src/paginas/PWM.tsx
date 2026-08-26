@@ -22,7 +22,6 @@ function PWM() {
   // Estado del bloque de modulación de señales.
   const [modulacion, setModulacion] = useState({
     frecuenciaSenal: 1000,
-    ts: 1000,
     activa: false,
   });
   const socketRef = useRef<WebSocket | null>(null);
@@ -133,9 +132,12 @@ function PWM() {
     setEstado((prev) => ({ ...prev, encendido: false }));
     const maximo = estado.maximo;
     const duties = [0, maximo, 0, maximo, 0, maximo, 0, maximo];
+    // ts automático: 120 muestras por período de la señal modulada.
+    // ts (µs) = 1_000_000 / (frecuenciaSenal * 120)
+    const ts = Math.round(1_000_000 / (modulacion.frecuenciaSenal * 120));
     enviar({
       accion: "modular",
-      ts: modulacion.ts,
+      ts,
       duties,
     });
     setModulacion((prev) => ({ ...prev, activa: true }));
@@ -241,22 +243,6 @@ function PWM() {
               setModulacion((prev) => ({
                 ...prev,
                 frecuenciaSenal: Number(e.target.value),
-              }))
-            }
-          />
-        </div>
-
-        <div className="campo">
-          <label htmlFor="ts">Intervalo ts (µs)</label>
-          <input
-            id="ts"
-            type="number"
-            min={1}
-            value={modulacion.ts}
-            onChange={(e) =>
-              setModulacion((prev) => ({
-                ...prev,
-                ts: Number(e.target.value),
               }))
             }
           />
