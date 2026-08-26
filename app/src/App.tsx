@@ -3,6 +3,7 @@ import Encabezado from "./componentes/Encabezado";
 import MenuLateral from "./componentes/MenuLateral";
 import Inicio from "./paginas/Inicio";
 import PWM from "./paginas/PWM";
+import ADC from "./paginas/ADC";
 import "./App.css";
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Inicio />} />
             <Route path="/pwm" element={<PWM />} />
+            <Route path="/adc" element={<ADC />} />
           </Routes>
         </main>
       </div>

@@ -100,13 +100,9 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
         }
     }
 
-    // Ajusta el periodo del timer a la resolución del ts: si el ts es menor
-    // que el periodo base, usa un periodo más fino (mínimo 100 us).
-    uint32_t periodoUs = TIMER_PERIODO_US;
-    if (ts < periodoUs)
-    {
-        periodoUs = ts < 100 ? 100 : ts;
-    }
+    // Ajusta el periodo del timer a la resolución del ts.
+    // Usa el ts directamente como periodo del timer (mínimo 1 us).
+    uint32_t periodoUs = ts < 1 ? 1 : ts;
     esp_timer_start_periodic(_timer, periodoUs);
 }
 

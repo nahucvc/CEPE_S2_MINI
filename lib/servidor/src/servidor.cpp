@@ -1,5 +1,6 @@
 #include "servidor.h"
 #include "PWM.h"
+#include "ADC.h"
 
 AsyncWebServer server(80); // creacion del servidor
 AsyncWebSocket ws("/ws");
@@ -12,6 +13,18 @@ uint8_t pwmPin = 15;
 uint32_t pwmFrecuencia = 1000;
 uint8_t pwmResolucion = 8;
 uint32_t pwmDuty = 0;
+
+// Estado del ADC
+ADC adc;
+bool adcEncendido = false;
+uint8_t adcPin = 4;           // GPIO4 = ADC1_CH0
+adc_unit_t adcUnidad = ADC_UNIT_1;
+adc_channel_t adcCanal = ADC_CHANNEL_0;
+adc_atten_t adcAtenuacion = ADC_ATTEN_DB_12;
+uint8_t adcResolucion = 12;  // 9-12 bits
+uint32_t adcFrecuenciaEnvio = 100;  // Hz
+uint64_t adcUltimoEnvio = 0;
+uint32_t adcPeriodoEnvioUs = 10000;  // microsegundos
 
 void notFound(AsyncWebServerRequest *request)
 {
@@ -35,6 +48,45 @@ void enviarEstadoPwm()
     doc["resolucion"] = pwmResolucion;
     doc["duty"] = pwmDuty;
     doc["maximo"] = pwm.obtenerMaximo();
+
+    String salida;
+    serializeJson(doc, salida);
+    ws.textAll(salida);
+}
+
+void enviarEstadoAdc()
+{
+    StaticJsonDocument<256> doc;
+    doc["tipo"] = "adc";
+    doc["encendido"] = adcEncendido;
+    doc["pin"] = adcPin;
+    doc["resolucion"] = adcResolucion;
+    doc["frecuenciaEnvio"] = adcFrecuenciaEnvio;
+    doc["maximo"] = adc.getMaximoValor();
+
+    String salida;
+    serializeJson(doc, salida);
+    ws.textAll(salida);
+}
+
+void enviarLecturaAdc()
+{
+    if (!adcEncendido || !adc.estaConfigurado()) return;
+
+    uint64_t ahora = esp_timer_get_time();
+    if (ahora - adcUltimoEnvio < adcPeriodoEnvioUs) return;
+    adcUltimoEnvio = ahora;
+
+    int valor = adc.leer();
+    if (valor < 0) return;
+
+    float voltaje = adc.leerVoltaje();
+
+    StaticJsonDocument<128> doc;
+    doc["tipo"] = "adc";
+    doc["valor"] = valor;
+    doc["voltaje"] = voltaje;
+    doc["timestamp"] = (uint32_t)(ahora / 1000);  // ms
 
     String salida;
     serializeJson(doc, salida);
@@ -84,10 +136,10 @@ void procesarComandoPwm(JsonObject comando)
         }
 
         // Copia los duties a un vector estático (la secuencia se procesa por timer).
-        static uint32_t dutiesBuffer[64];
-        if (longitud > 64)
+        static uint32_t dutiesBuffer[120];
+        if (longitud > 120)
         {
-            longitud = 64;
+            longitud = 120;
         }
         for (size_t i = 0; i < longitud; i++)
         {
@@ -110,6 +162,50 @@ void procesarComandoPwm(JsonObject comando)
     }
 
     enviarEstadoPwm();
+}
+
+void procesarComandoAdc(JsonObject comando)
+{
+    const char *accion = comando["accion"] | "";
+
+    if (strcmp(accion, "configurar") == 0)
+    {
+        adcPin = comando["pin"] | adcPin;
+        adcResolucion = comando["resolucion"] | adcResolucion;
+        adcFrecuenciaEnvio = comando["frecuenciaEnvio"] | adcFrecuenciaEnvio;
+        adcPeriodoEnvioUs = 1000000 / adcFrecuenciaEnvio;
+
+        // Determinar unidad y canal según el pin (solo ADC1 en ESP32-S2)
+        if (adcPin >= 1 && adcPin <= 10) {
+            adcUnidad = ADC_UNIT_1;
+            adcCanal = (adc_channel_t)(adcPin - 1);
+        } else {
+            // Por defecto ADC1_CH0 (GPIO4)
+            adcUnidad = ADC_UNIT_1;
+            adcCanal = ADC_CHANNEL_0;
+            adcPin = 4;
+        }
+
+        adc.configurar(adcUnidad, adcCanal, adcAtenuacion, adcResolucion);
+        adcEncendido = false;
+    }
+    else if (strcmp(accion, "encender") == 0)
+    {
+        if (adc.estaConfigurado()) {
+            adcEncendido = true;
+            adcUltimoEnvio = 0;  // Forzar envío inmediato
+        }
+    }
+    else if (strcmp(accion, "apagar") == 0)
+    {
+        adcEncendido = false;
+    }
+    else
+    {
+        return;
+    }
+
+    enviarEstadoAdc();
 }
 
 void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEventType evento, void *arg, uint8_t *datos, size_t len)
@@ -142,7 +238,7 @@ void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEv
 
     String comando(reinterpret_cast<char *>(datos), len);
 
-    // Si el mensaje es JSON, se procesa como comando de un periférico (p.ej. PWM).
+    // Si el mensaje es JSON, se procesa como comando de un periférico (p.ej. PWM, ADC).
     if (comando.startsWith("{"))
     {
         StaticJsonDocument<256> doc;
@@ -156,6 +252,10 @@ void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEv
         if (strcmp(periferico, "pwm") == 0)
         {
             procesarComandoPwm(doc.as<JsonObject>());
+        }
+        else if (strcmp(periferico, "adc") == 0)
+        {
+            procesarComandoAdc(doc.as<JsonObject>());
         }
         return;
     }

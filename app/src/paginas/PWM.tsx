@@ -22,6 +22,7 @@ function PWM() {
   // Estado del bloque de modulación de señales.
   const [modulacion, setModulacion] = useState({
     frecuenciaSenal: 1000,
+    frecuenciaPortadora: 100000,
     activa: false,
   });
   const socketRef = useRef<WebSocket | null>(null);
@@ -125,16 +126,38 @@ function PWM() {
     enviar({ accion: nuevo ? "encender" : "apagar" });
   };
 
-  // Genera una señal cuadrada: alterna entre duty 0 y duty máximo.
+  // Genera una señal modulada: configura PWM a alta frecuencia (portadora)
+  // y varía el duty cycle siguiendo la forma de onda deseada.
   const iniciarModulacion = () => {
     // Detiene el control PWM antes de iniciar la modulación.
     enviar({ accion: "apagar" });
     setEstado((prev) => ({ ...prev, encendido: false }));
+
+    // 1. Configura PWM con frecuencia de portadora ALTA (ej. 100 kHz)
+    enviar({
+      accion: "configurar",
+      pin: estado.pin,
+      frecuencia: modulacion.frecuenciaPortadora,
+      resolucion: estado.resolucion,
+    });
+
+    // 2. Genera 120 muestras de duty cycle para un período de la señal modulada
+    // Para señal cuadrada: duty alterna entre 0 y máximo
+    // Para senoidal: duty = (1 + sin(2π * i / 120)) / 2 * maximo
     const maximo = estado.maximo;
-    const duties = [0, maximo, 0, maximo, 0, maximo, 0, maximo];
-    // ts automático: 120 muestras por período de la señal modulada.
-    // ts (µs) = 1_000_000 / (frecuenciaSenal * 120)
+    const duties: number[] = [];
+    for (let i = 0; i < 120; i++) {
+      // Señal cuadrada: 60 muestras alto, 60 bajo
+      // Para senoidal, descomenta la línea de abajo y comenta la de arriba:
+      // const valor = Math.round((1 + Math.sin(2 * Math.PI * i / 120)) / 2 * maximo);
+      const valor = i < 60 ? maximo : 0;
+      duties.push(valor);
+    }
+
+    // ts = período de la señal modulada / 120
     const ts = Math.round(1_000_000 / (modulacion.frecuenciaSenal * 120));
+
+    // 3. Inicia la modulación
     enviar({
       accion: "modular",
       ts,
@@ -243,6 +266,22 @@ function PWM() {
               setModulacion((prev) => ({
                 ...prev,
                 frecuenciaSenal: Number(e.target.value),
+              }))
+            }
+          />
+        </div>
+
+        <div className="campo">
+          <label htmlFor="frecuenciaPortadora">Frecuencia portadora PWM (Hz)</label>
+          <input
+            id="frecuenciaPortadora"
+            type="number"
+            min={1000}
+            value={modulacion.frecuenciaPortadora}
+            onChange={(e) =>
+              setModulacion((prev) => ({
+                ...prev,
+                frecuenciaPortadora: Number(e.target.value),
               }))
             }
           />

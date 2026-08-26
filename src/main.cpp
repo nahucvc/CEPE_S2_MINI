@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include "servidor.h"
 #include <PWM.h>
+#include <ADC.h>
 
 const char *ssid = "ESP";
 const char *password = "123456789";
@@ -25,10 +26,8 @@ void setup()
  
 }
 
-
-
 void loop() {
-  
-  
+  // Actualizar ADC para envío periódico de lecturas
+  enviarLecturaAdc();
 }
 
