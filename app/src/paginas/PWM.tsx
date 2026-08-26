@@ -19,6 +19,12 @@ function PWM() {
     maximo: 255,
   });
   const [conectado, setConectado] = useState(false);
+  // Estado del bloque de modulación de señales.
+  const [modulacion, setModulacion] = useState({
+    frecuenciaSenal: 1000,
+    ts: 1000,
+    activa: false,
+  });
   const socketRef = useRef<WebSocket | null>(null);
   // Último duty enviado a la ESP32, para evitar paquetes repetidos.
   const ultimoDutyEnviadoRef = useRef<number>(0);
@@ -71,9 +77,13 @@ function PWM() {
       const dutyActual = estado.duty;
       if (dutyActual !== ultimoDutyEnviadoRef.current) {
         ultimoDutyEnviadoRef.current = dutyActual;
-        socket.send(
-          JSON.stringify({ periferico: "pwm", accion: "duty", duty: dutyActual })
-        );
+        try {
+          socket.send(
+            JSON.stringify({ periferico: "pwm", accion: "duty", duty: dutyActual })
+          );
+        } catch {
+          // El socket se cerró entre la comprobación y el envío; se ignora.
+        }
       }
     }, 80);
 
@@ -83,7 +93,11 @@ function PWM() {
   const enviar = (comando: Record<string, unknown>) => {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ periferico: "pwm", ...comando }));
+      try {
+        socket.send(JSON.stringify({ periferico: "pwm", ...comando }));
+      } catch {
+        // El socket se cerró entre la comprobación y el envío; se ignora.
+      }
     }
   };
 
@@ -102,9 +116,34 @@ function PWM() {
   };
 
   const alternar = () => {
+    // Si la modulación está activa, se detiene antes de usar el control PWM.
+    if (modulacion.activa) {
+      enviar({ accion: "detener_modulacion" });
+      setModulacion((prev) => ({ ...prev, activa: false }));
+    }
     const nuevo = !estado.encendido;
     setEstado((prev) => ({ ...prev, encendido: nuevo }));
     enviar({ accion: nuevo ? "encender" : "apagar" });
+  };
+
+  // Genera una señal cuadrada: alterna entre duty 0 y duty máximo.
+  const iniciarModulacion = () => {
+    // Detiene el control PWM antes de iniciar la modulación.
+    enviar({ accion: "apagar" });
+    setEstado((prev) => ({ ...prev, encendido: false }));
+    const maximo = estado.maximo;
+    const duties = [0, maximo, 0, maximo, 0, maximo, 0, maximo];
+    enviar({
+      accion: "modular",
+      ts: modulacion.ts,
+      duties,
+    });
+    setModulacion((prev) => ({ ...prev, activa: true }));
+  };
+
+  const detenerModulacion = () => {
+    enviar({ accion: "detener_modulacion" });
+    setModulacion((prev) => ({ ...prev, activa: false }));
   };
 
   return (
@@ -183,8 +222,51 @@ function PWM() {
         <button
           className={`btn ${estado.encendido ? "btn-off" : "btn-on"}`}
           onClick={alternar}
+          disabled={modulacion.activa}
         >
           {estado.encendido ? "Apagar" : "Encender"}
+        </button>
+      </div>
+
+      <h3>Modulación de señal</h3>
+      <div className="panel">
+        <div className="campo">
+          <label htmlFor="frecuenciaSenal">Frecuencia de la señal (Hz)</label>
+          <input
+            id="frecuenciaSenal"
+            type="number"
+            min={1}
+            value={modulacion.frecuenciaSenal}
+            onChange={(e) =>
+              setModulacion((prev) => ({
+                ...prev,
+                frecuenciaSenal: Number(e.target.value),
+              }))
+            }
+          />
+        </div>
+
+        <div className="campo">
+          <label htmlFor="ts">Intervalo ts (µs)</label>
+          <input
+            id="ts"
+            type="number"
+            min={1}
+            value={modulacion.ts}
+            onChange={(e) =>
+              setModulacion((prev) => ({
+                ...prev,
+                ts: Number(e.target.value),
+              }))
+            }
+          />
+        </div>
+
+        <button
+          className={`btn ${modulacion.activa ? "btn-off" : "btn-configurar"}`}
+          onClick={modulacion.activa ? detenerModulacion : iniciarModulacion}
+        >
+          {modulacion.activa ? "Detener modulación" : "Iniciar modulación"}
         </button>
       </div>
     </div>

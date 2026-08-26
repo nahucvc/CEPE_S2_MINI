@@ -81,6 +81,11 @@ body {
   margin-top: 0;
 }
 
+.pagina h3 {
+  margin-top: 2rem;
+  color: #cfd0d8;
+}
+
 /* Panel de configuración */
 .panel {
   display: flex;
@@ -111,6 +116,17 @@ body {
   background: #1e1f26;
   color: #f2f2f2;
   font-size: 1rem;
+}
+
+.campo input[type="number"]:disabled,
+.campo input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .campo input[type="range"] {

@@ -72,6 +72,38 @@ void procesarComandoPwm(JsonObject comando)
         pwmEncendido = false;
         pwm.escribir(0);
     }
+    else if (strcmp(accion, "modular") == 0)
+    {
+        // Modula una señal PWM recorriendo un vector de duties con intervalo fijo ts.
+        uint32_t ts = comando["ts"] | 1000;
+        JsonArray dutiesJson = comando["duties"].as<JsonArray>();
+        size_t longitud = dutiesJson.size();
+        if (longitud == 0)
+        {
+            return;
+        }
+
+        // Copia los duties a un vector estático (la secuencia se procesa por timer).
+        static uint32_t dutiesBuffer[64];
+        if (longitud > 64)
+        {
+            longitud = 64;
+        }
+        for (size_t i = 0; i < longitud; i++)
+        {
+            dutiesBuffer[i] = dutiesJson[i].as<uint32_t>();
+        }
+
+        pwmEncendido = true;
+        pwm.reproducirSecuencia(dutiesBuffer, longitud, ts);
+    }
+    else if (strcmp(accion, "detener_modulacion") == 0)
+    {
+        pwm.detenerSecuencia();
+        pwmEncendido = false;
+        pwmDuty = 0;
+        pwm.escribir(0);
+    }
     else
     {
         return;
@@ -162,6 +194,9 @@ void IniciarServidor(void)
 
     pinMode(PIN_LED, OUTPUT);
     digitalWrite(PIN_LED, estadoLed);
+
+    // Activa la depuración de la librería PWM por Serial.
+    pwm.depurar(true);
 
     // El WebSocket debe registrarse ANTES que los handlers HTTP genéricos,
     // para que la ruta /ws no sea interceptada por el regex de archivos.
