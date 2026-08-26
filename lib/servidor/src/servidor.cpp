@@ -1,17 +1,83 @@
 #include "servidor.h"
+#include "PWM.h"
 
 AsyncWebServer server(80); // creacion del servidor
 AsyncWebSocket ws("/ws");
 bool estadoLed = false;
 
+// Estado del PWM
+PWM pwm;
+bool pwmEncendido = false;
+uint8_t pwmPin = 15;
+uint32_t pwmFrecuencia = 1000;
+uint8_t pwmResolucion = 8;
+uint32_t pwmDuty = 0;
+
 void notFound(AsyncWebServerRequest *request)
 {
-    request->send(404, "text/plain", "La pagina no fue encontrada");
+    // Fallback SPA: cualquier ruta que no corresponda a un archivo real
+    // devuelve index.html para que React Router maneje la navegación.
+    request->send(SPIFFS, "/index.html", "text/html");
 }
 
 void enviarEstadoLed()
 {
     ws.textAll(estadoLed ? "1" : "0");
+}
+
+void enviarEstadoPwm()
+{
+    StaticJsonDocument<256> doc;
+    doc["tipo"] = "pwm";
+    doc["encendido"] = pwmEncendido;
+    doc["pin"] = pwmPin;
+    doc["frecuencia"] = pwmFrecuencia;
+    doc["resolucion"] = pwmResolucion;
+    doc["duty"] = pwmDuty;
+    doc["maximo"] = pwm.obtenerMaximo();
+
+    String salida;
+    serializeJson(doc, salida);
+    ws.textAll(salida);
+}
+
+void procesarComandoPwm(JsonObject comando)
+{
+    const char *accion = comando["accion"] | "";
+
+    if (strcmp(accion, "configurar") == 0)
+    {
+        pwmPin = comando["pin"] | pwmPin;
+        pwmFrecuencia = comando["frecuencia"] | pwmFrecuencia;
+        pwmResolucion = comando["resolucion"] | pwmResolucion;
+        pwm.configurar(pwmPin, pwmFrecuencia, pwmResolucion);
+        pwmDuty = 0;
+        pwmEncendido = false;
+    }
+    else if (strcmp(accion, "duty") == 0)
+    {
+        pwmDuty = comando["duty"] | pwmDuty;
+        if (pwmEncendido)
+        {
+            pwm.escribir(pwmDuty);
+        }
+    }
+    else if (strcmp(accion, "encender") == 0)
+    {
+        pwmEncendido = true;
+        pwm.escribir(pwmDuty);
+    }
+    else if (strcmp(accion, "apagar") == 0)
+    {
+        pwmEncendido = false;
+        pwm.escribir(0);
+    }
+    else
+    {
+        return;
+    }
+
+    enviarEstadoPwm();
 }
 
 void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEventType evento, void *arg, uint8_t *datos, size_t len)
@@ -43,6 +109,26 @@ void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEv
     }
 
     String comando(reinterpret_cast<char *>(datos), len);
+
+    // Si el mensaje es JSON, se procesa como comando de un periférico (p.ej. PWM).
+    if (comando.startsWith("{"))
+    {
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, comando);
+        if (error)
+        {
+            return;
+        }
+
+        const char *periferico = doc["periferico"] | "";
+        if (strcmp(periferico, "pwm") == 0)
+        {
+            procesarComandoPwm(doc.as<JsonObject>());
+        }
+        return;
+    }
+
+    // Comandos simples del LED.
     if (comando == "on")
     {
         estadoLed = true;
