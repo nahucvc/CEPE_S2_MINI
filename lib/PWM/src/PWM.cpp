@@ -1,17 +1,24 @@
 #include "PWM.h"
 
+// Tamaño máximo del buffer de secuencia (100 elementos como se solicitó)
+#define PWM_MAX_SECUENCIA 100
+
 PWM::PWM()
     : _pin(15), _frecuencia(1000), _resolucion(8), _maximo(255), _configurado(false),
-      _duties(nullptr), _ts(0), _longitud(0), _indice(0),
-      _inicioUs(0), _secuenciaActiva(false), _timer(nullptr)
+      _ts(0), _longitud(0), _indice(0),
+      _secuenciaActiva(false), _timer(nullptr)
 {
+    // Inicializar buffer interno a cero
+    for (size_t i = 0; i < PWM_MAX_SECUENCIA; i++) {
+        _bufferDuties[i] = 0;
+    }
 }
 
-// Callback del timer: llama a actualizar() sobre la instancia PWM.
+// Callback del timer: avanza un paso en la secuencia circular.
 static void pwmTimerCallback(void *arg)
 {
     PWM *instancia = static_cast<PWM *>(arg);
-    instancia->actualizar();
+    instancia->avanzarPaso();
 }
 
 void PWM::configurar(uint8_t pin, uint32_t frecuencia, uint8_t resolucion)
@@ -71,21 +78,35 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
 {
     if (!_configurado || duties == nullptr || longitud == 0 || ts == 0)
     {
+        Serial.printf("[PWM ESP32] reproducirSecuencia rechazada: config=%d duties=%p long=%u ts=%lu\n",
+                      _configurado, (void*)duties, (unsigned int)longitud, (unsigned long)ts);
         return;
     }
 
-    _duties = duties;
+    // Limitar a máximo 100 elementos
+    size_t elementosACopiar = (longitud > PWM_MAX_SECUENCIA) ? PWM_MAX_SECUENCIA : longitud;
+
+    // Copiar datos al buffer interno (seguro, no depende de memoria externa)
+    for (size_t i = 0; i < elementosACopiar; i++)
+    {
+        uint32_t valor = duties[i];
+        if (valor > _maximo) valor = _maximo;
+        _bufferDuties[i] = valor;
+    }
+
+    _longitud = elementosACopiar;
     _ts = ts;
-    _longitud = longitud;
     _indice = 0;
-    _inicioUs = micros();
     _secuenciaActiva = true;
 
+    Serial.printf("[PWM ESP32] reproducirSecuencia: long=%u ts=%lu max=%lu\n",
+                  (unsigned int)_longitud, (unsigned long)_ts, (unsigned long)_maximo);
+
     // Aplica el primer duty de inmediato.
-    escribir(_duties[0]);
+    escribir(_bufferDuties[0]);
     _indice = 1;
 
-    // Crea y arranca el timer periódico que procesa la secuencia.
+    // Crea el timer si no existe.
     if (_timer == nullptr)
     {
         esp_timer_create_args_t args = {};
@@ -95,39 +116,35 @@ void PWM::reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t 
         esp_err_t err = esp_timer_create(&args, &_timer);
         if (err != ESP_OK)
         {
+            Serial.printf("[PWM ESP32] ERROR creando timer: %d\n", err);
             _secuenciaActiva = false;
             return;
         }
     }
 
-    // Ajusta el periodo del timer a la resolución del ts.
-    // Usa el ts directamente como periodo del timer (mínimo 1 us).
-    uint32_t periodoUs = ts < 1 ? 1 : ts;
-    esp_timer_start_periodic(_timer, periodoUs);
+    // Configura el timer para disparar exactamente cada 'ts' microsegundos.
+    // Cada disparo llama a avanzarPaso() que escribe el siguiente duty.
+    uint32_t periodoUs = (ts < 1) ? 1 : ts;
+    esp_err_t err = esp_timer_start_periodic(_timer, periodoUs);
+    Serial.printf("[PWM ESP32] Timer iniciado: periodo=%lu us, err=%d\n", (unsigned long)periodoUs, err);
 }
 
-void PWM::actualizar()
+// Avanza un paso en la secuencia circular - llamado desde el timer ISR.
+void PWM::avanzarPaso()
 {
-    if (!_secuenciaActiva || !_configurado)
+    if (!_secuenciaActiva || !_configurado || _longitud == 0)
     {
         return;
     }
 
-    uint32_t transcurrido = micros() - _inicioUs;
+    // Escribe el duty actual y avanza al siguiente (circular).
+    escribir(_bufferDuties[_indice]);
+    _indice++;
 
-    // Aplica todos los duties cuyo instante (indice * ts) ya haya llegado.
-    while (_indice < _longitud && transcurrido >= (_indice * _ts))
-    {
-        escribir(_duties[_indice]);
-        _indice++;
-    }
-
-    // Cuando se llega al final del vector, se reinicia para repetir la
-    // secuencia indefinidamente (bucle infinito).
+    // Circular: volver al inicio cuando se llega al final.
     if (_indice >= _longitud)
     {
         _indice = 0;
-        _inicioUs = micros();
     }
 }
 
@@ -143,8 +160,7 @@ void PWM::detenerSecuencia()
         esp_timer_stop(_timer);
     }
     _secuenciaActiva = false;
-    _duties = nullptr;
-    _ts = 0;
     _longitud = 0;
     _indice = 0;
+    _ts = 0;
 }

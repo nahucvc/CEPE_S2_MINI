@@ -49,31 +49,24 @@ public:
     /**
      * @brief Reproduce una secuencia de valores de duty con intervalo fijo.
      *
-     * Cada elemento del vector `duties` se aplica cada `ts` microsegundos de forma
-     * uniforme. El primer duty se aplica de inmediato y los siguientes cada `ts` us.
-     * La secuencia se procesa automáticamente mediante un timer de hardware, sin
-     * necesidad de llamar a `actualizar()` desde loop(). Al llegar al final del
-     * vector, la secuencia se repite indefinidamente (bucle infinito) hasta que
-     * se llame a `detenerSecuencia()`.
+     * Copia hasta 100 elementos del vector `duties` a un buffer interno.
+     * Cada elemento se aplica cada `ts` microsegundos de forma uniforme.
+     * El primer duty se aplica de inmediato y los siguientes cada `ts` us.
+     * La secuencia se procesa automáticamente mediante un timer de hardware,
+     * sin necesidad de llamar a actualizar() desde loop(). Al llegar al final
+     * del vector, la secuencia se repite indefinidamente (bucle circular)
+     * hasta que se llame a `detenerSecuencia()`.
      *
-     * @param duties   Vector con los valores de duty a aplicar.
+     * @param duties   Vector con los valores de duty a aplicar (máx. 100).
      * @param longitud Número de elementos del vector.
      * @param ts       Intervalo fijo (microsegundos) entre cada cambio de duty.
      */
     void reproducirSecuencia(const uint32_t *duties, size_t longitud, uint32_t ts);
 
     /**
-     * @brief Procesa la secuencia activa según el tiempo transcurrido.
-     *
-     * Es invocada automáticamente por el timer de hardware. No es necesario
-     * llamarla desde loop().
-     */
-    void actualizar();
-
-    /**
      * @brief Indica si hay una secuencia en reproducción.
      *
-     * @return true si la secuencia aún no ha terminado.
+     * @return true si la secuencia está activa.
      */
     bool secuenciaActiva() const;
 
@@ -82,7 +75,18 @@ public:
      */
     void detenerSecuencia();
 
+    /**
+     * @brief Avanza un paso en la secuencia circular.
+     *
+     * Llamado automáticamente por el timer de hardware cada `ts` microsegundos.
+     * Escribe el duty actual y avanza al siguiente índice (circular).
+     */
+    void avanzarPaso();
+
 private:
+    // Tamaño máximo del buffer de secuencia (100 elementos)
+    static constexpr size_t MAX_SECUENCIA = 100;
+
     uint8_t _pin;        // Pin de salida PWM
     uint32_t _frecuencia; // Frecuencia en Hz
     uint8_t _resolucion;  // Resolución en bits
@@ -90,16 +94,14 @@ private:
     bool _configurado;    // Indica si el PWM fue configurado
 
     // Estado de la secuencia
-    const uint32_t *_duties;      // Vector de duties
+    uint32_t _bufferDuties[MAX_SECUENCIA]; // Buffer interno de duties (100 elementos)
     uint32_t _ts;                 // Intervalo fijo (us) entre cambios de duty
-    size_t _longitud;             // Longitud del vector
+    size_t _longitud;             // Longitud de la secuencia activa (<= 100)
     size_t _indice;               // Índice del siguiente duty a aplicar
-    uint32_t _inicioUs;           // Momento de inicio de la secuencia (us)
     bool _secuenciaActiva;        // Indica si hay secuencia en reproducción
 
     // Timer de hardware para procesar la secuencia
-    esp_timer_handle_t _timer;    // Manejador del timer
-    static constexpr uint32_t TIMER_PERIODO_US = 1000; // 1 ms
+    esp_timer_handle_t _timer;
 };
 
 #endif

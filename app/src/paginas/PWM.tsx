@@ -9,6 +9,8 @@ type EstadoPwm = {
   maximo: number;
 };
 
+type TipoOnda = "senoidal" | "cuadrada" | "triangular" | "sierra";
+
 function PWM() {
   const [estado, setEstado] = useState<EstadoPwm>({
     encendido: false,
@@ -21,8 +23,9 @@ function PWM() {
   const [conectado, setConectado] = useState(false);
   // Estado del bloque de modulación de señales.
   const [modulacion, setModulacion] = useState({
-    frecuenciaSenal: 1000,
-    frecuenciaPortadora: 100000,
+    frecuenciaSenal: 100,      // Frecuencia de la señal a generar (Hz)
+    frecuenciaPortadora: 100000, // Frecuencia PWM portadora (Hz)
+    tipoOnda: "senoidal" as TipoOnda,
     activa: false,
   });
   const socketRef = useRef<WebSocket | null>(null);
@@ -40,9 +43,11 @@ function PWM() {
       socket.addEventListener("open", () => setConectado(true));
 
       socket.addEventListener("message", (evento) => {
+        console.log("[PWM Frontend] RECIBIDO:", evento.data);
         try {
           const datos = JSON.parse(evento.data);
           if (datos.tipo === "pwm") {
+            console.log("[PWM Frontend] Estado PWM recibido:", datos);
             setEstado(datos);
             ultimoDutyEnviadoRef.current = datos.duty;
           }
@@ -94,14 +99,23 @@ function PWM() {
     const socket = socketRef.current;
     if (socket && socket.readyState === WebSocket.OPEN) {
       try {
-        socket.send(JSON.stringify({ periferico: "pwm", ...comando }));
+        const mensaje = { periferico: "pwm", ...comando };
+        console.log("[PWM Frontend] ENVIADO:", JSON.stringify(mensaje));
+        socket.send(JSON.stringify(mensaje));
       } catch {
         // El socket se cerró entre la comprobación y el envío; se ignora.
       }
+    } else {
+      console.warn("[PWM Frontend] No se pudo enviar - socket no disponible:", comando);
     }
   };
 
   const aplicarConfiguracion = () => {
+    console.log("[PWM Frontend] Aplicar configuración:", {
+      pin: estado.pin,
+      frecuencia: estado.frecuencia,
+      resolucion: estado.resolucion,
+    });
     enviar({
       accion: "configurar",
       pin: estado.pin,
@@ -112,23 +126,93 @@ function PWM() {
 
   const cambiarDuty = (duty: number) => {
     // Solo actualiza el estado local; el envío lo hace la función periódica.
+    console.log("[PWM Frontend] Duty cambiado:", duty);
     setEstado((prev) => ({ ...prev, duty }));
   };
 
   const alternar = () => {
     // Si la modulación está activa, se detiene antes de usar el control PWM.
     if (modulacion.activa) {
+      console.log("[PWM Frontend] Deteniendo modulación antes de alternar");
       enviar({ accion: "detener_modulacion" });
       setModulacion((prev) => ({ ...prev, activa: false }));
     }
     const nuevo = !estado.encendido;
+    console.log("[PWM Frontend] Alternar PWM:", nuevo ? "ENCENDER" : "APAGAR");
     setEstado((prev) => ({ ...prev, encendido: nuevo }));
     enviar({ accion: nuevo ? "encender" : "apagar" });
+  };
+
+  // Genera los 100 valores de duty cycle para UN período de la señal modulada.
+  // El frontend calcula:
+  // - frecuenciaCambioPWM = frecuenciaSenal * 100 (veces que cambia el PWM por segundo)
+  // - ts = 1_000_000 / frecuenciaCambioPWM (microsegundos entre cada cambio de duty)
+  const generarDuties = (): number[] => {
+    const maximo = estado.maximo;
+    const duties: number[] = [];
+    const { tipoOnda } = modulacion;
+
+    for (let i = 0; i < 100; i++) {
+      const fase = (2 * Math.PI * i) / 100; // 0 a 2π en 100 pasos
+      let valor: number;
+
+      switch (tipoOnda) {
+        case "senoidal":
+          // Senoidal: (1 + sin(fase)) / 2 * maximo → va de 0 a maximo
+          valor = Math.round(((1 + Math.sin(fase)) / 2) * maximo);
+          break;
+        case "cuadrada":
+          // Cuadrada: 50% alto, 50% bajo
+          valor = i < 50 ? maximo : 0;
+          break;
+        case "triangular":
+          // Triangular: sube linealmente 0→maximo, luego baja maximo→0
+          if (i < 50) {
+            valor = Math.round((i / 50) * maximo);
+          } else {
+            valor = Math.round(((100 - i) / 50) * maximo);
+          }
+          break;
+        case "sierra":
+          // Sierra: sube linealmente 0→maximo y vuelve a 0 bruscamente
+          valor = Math.round((i / 100) * maximo);
+          break;
+        default:
+          valor = 0;
+      }
+      duties.push(valor);
+    }
+    console.log("[PWM Frontend] Duties generados:", {
+      tipoOnda,
+      maximo,
+      cantidad: duties.length,
+      primeros5: duties.slice(0, 5),
+      ultimos5: duties.slice(-5),
+      min: Math.min(...duties),
+      max: Math.max(...duties),
+    });
+    return duties;
+  };
+
+  // Calcula ts (microsegundos entre cada muestra) basado en la frecuencia de la señal.
+  // frecuenciaCambioPWM = frecuenciaSenal * 100 (cambios por segundo)
+  // ts = 1_000_000 / frecuenciaCambioPWM (microsegundos)
+  const calcularTs = (): number => {
+    const { frecuenciaSenal } = modulacion;
+    const frecuenciaCambioPWM = frecuenciaSenal * 100; // Hz
+    const ts = Math.round(1_000_000 / frecuenciaCambioPWM); // µs
+    console.log("[PWM Frontend] Calcular TS:", {
+      frecuenciaSenal,
+      frecuenciaCambioPWM,
+      ts,
+    });
+    return ts;
   };
 
   // Genera una señal modulada: configura PWM a alta frecuencia (portadora)
   // y varía el duty cycle siguiendo la forma de onda deseada.
   const iniciarModulacion = () => {
+    console.log("[PWM Frontend] Iniciar modulación:", modulacion);
     // Detiene el control PWM antes de iniciar la modulación.
     enviar({ accion: "apagar" });
     setEstado((prev) => ({ ...prev, encendido: false }));
@@ -141,23 +225,14 @@ function PWM() {
       resolucion: estado.resolucion,
     });
 
-    // 2. Genera 120 muestras de duty cycle para un período de la señal modulada
-    // Para señal cuadrada: duty alterna entre 0 y máximo
-    // Para senoidal: duty = (1 + sin(2π * i / 120)) / 2 * maximo
-    const maximo = estado.maximo;
-    const duties: number[] = [];
-    for (let i = 0; i < 120; i++) {
-      // Señal cuadrada: 60 muestras alto, 60 bajo
-      // Para senoidal, descomenta la línea de abajo y comenta la de arriba:
-      // const valor = Math.round((1 + Math.sin(2 * Math.PI * i / 120)) / 2 * maximo);
-      const valor = i < 60 ? maximo : 0;
-      duties.push(valor);
-    }
+    // 2. Genera 100 muestras de duty cycle para un período de la señal modulada
+    const duties = generarDuties();
 
-    // ts = período de la señal modulada / 120
-    const ts = Math.round(1_000_000 / (modulacion.frecuenciaSenal * 120));
+    // 3. Calcula ts: período de muestreo = 1 / (frecuenciaSenal * 100)
+    const ts = calcularTs();
 
-    // 3. Inicia la modulación
+    // 4. Inicia la modulación
+    console.log("[PWM Frontend] Enviando comando modular:", { ts, cantidadDuties: duties.length });
     enviar({
       accion: "modular",
       ts,
@@ -167,6 +242,7 @@ function PWM() {
   };
 
   const detenerModulacion = () => {
+    console.log("[PWM Frontend] Detener modulación");
     enviar({ accion: "detener_modulacion" });
     setModulacion((prev) => ({ ...prev, activa: false }));
   };
@@ -256,11 +332,14 @@ function PWM() {
       <h3>Modulación de señal</h3>
       <div className="panel">
         <div className="campo">
-          <label htmlFor="frecuenciaSenal">Frecuencia de la señal (Hz)</label>
+          <label htmlFor="frecuenciaSenal">
+            Frecuencia de la señal a generar (Hz)
+          </label>
           <input
             id="frecuenciaSenal"
             type="number"
             min={1}
+            max={10000}
             value={modulacion.frecuenciaSenal}
             onChange={(e) =>
               setModulacion((prev) => ({
@@ -269,6 +348,10 @@ function PWM() {
               }))
             }
           />
+          <small>
+            El PWM cambiará a {modulacion.frecuenciaSenal * 100} Hz
+            (ts = {calcularTs()} µs)
+          </small>
         </div>
 
         <div className="campo">
@@ -285,6 +368,25 @@ function PWM() {
               }))
             }
           />
+        </div>
+
+        <div className="campo">
+          <label htmlFor="tipoOnda">Tipo de onda</label>
+          <select
+            id="tipoOnda"
+            value={modulacion.tipoOnda}
+            onChange={(e) =>
+              setModulacion((prev) => ({
+                ...prev,
+                tipoOnda: e.target.value as TipoOnda,
+              }))
+            }
+          >
+            <option value="senoidal">Senoidal</option>
+            <option value="cuadrada">Cuadrada</option>
+            <option value="triangular">Triangular</option>
+            <option value="sierra">Sierra</option>
+          </select>
         </div>
 
         <button
