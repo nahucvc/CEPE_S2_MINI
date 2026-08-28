@@ -55,7 +55,7 @@ private:
     bool _calibrado = false;
     
     // Actualización periódica (modo oneshot)
-    uint32_t _frecuenciaActualizacion = 1000;  // Hz
+    uint32_t _frecuenciaActualizacion = 100;  // Hz
     uint32_t _periodoActualizacionUs = 1000000;  // microsegundos
     uint64_t _ultimaActualizacion = 0;
     int _ultimaLectura = 0;

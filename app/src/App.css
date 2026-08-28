@@ -168,3 +168,113 @@ body {
 .btn-configurar {
   background: #3498db;
 }
+
+/* ====== Layout ADC ====== */
+.grid-adc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Paneles ADC */
+.panel-adc,
+.panel-lectura,
+.panel-grafico {
+  max-width: none;
+  width: 100%;
+}
+
+.panel-adc h3,
+.panel-lectura h3,
+.panel-grafico h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #f2f2f2;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #3a3d4d;
+  padding-bottom: 0.6rem;
+}
+
+/* Acciones (botones) en fila */
+.acciones {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.acciones .btn {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* Select */
+.campo select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #3a3d4d;
+  border-radius: 6px;
+  background: #1e1f26;
+  color: #f2f2f2;
+  font-size: 1rem;
+}
+
+.campo small {
+  font-size: 0.8rem;
+  color: #8a8d9a;
+}
+
+/* Lectura actual */
+.panel-lectura .valores {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel-lectura .valor {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: #1e1f26;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+}
+
+.panel-lectura .etiqueta {
+  color: #cfd0d8;
+  font-size: 0.9rem;
+}
+
+.panel-lectura .numero {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #3498db;
+}
+
+.panel-lectura .unidad {
+  color: #8a8d9a;
+  font-size: 0.85rem;
+}
+
+/* Gráfico */
+.panel-grafico {
+  grid-column: 1 / -1; /* Ocupa todo el ancho */
+}
+
+.grafico-contenedor {
+  width: 100%;
+  overflow-x: auto;
+  background: #1e1f26;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.grafico-contenedor .uplot {
+  max-width: 100%;
+}
+
+.info-grafico {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: #8a8d9a;
+  text-align: center;
+}
