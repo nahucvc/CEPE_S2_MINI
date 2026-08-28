@@ -3,6 +3,7 @@
 #include "PWM.h"
 #include "ADC.h"
 #include "DAC.h"
+#include "ControladorGpio.h"
 
 AsyncWebServer server(80); // creacion del servidor
 AsyncWebSocket ws("/ws");
@@ -35,6 +36,15 @@ DAC dac;
 bool dacEncendido = false;
 uint8_t dacPin = 17;          // GPIO17 = DAC1
 uint8_t dacValor = 0;
+
+// Estado del GPIO
+ControladorGpio gpio;
+uint8_t gpioEntradas[4] = {0, 0, 0, 0};       // Pines de entrada
+ModoEntrada gpioModos[4] = {ENTRADA_FLOTANTE, ENTRADA_FLOTANTE, ENTRADA_FLOTANTE, ENTRADA_FLOTANTE};
+uint8_t gpioSalidas[4] = {0, 0, 0, 0};        // Pines de salida
+bool gpioEstadosSalida[4] = {false, false, false, false};
+bool gpioEntradasConfiguradas[4] = {false, false, false, false};
+bool gpioSalidasConfiguradas[4] = {false, false, false, false};
 
 void notFound(AsyncWebServerRequest *request)
 {

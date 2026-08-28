@@ -5,6 +5,7 @@ import Inicio from "./paginas/Inicio";
 import PWM from "./paginas/PWM";
 import ADC from "./paginas/ADC";
 import DAC from "./paginas/DAC";
+import GPIO from "./paginas/GPIO";
 import "./App.css";
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
             <Route path="/pwm" element={<PWM />} />
             <Route path="/adc" element={<ADC />} />
             <Route path="/dac" element={<DAC />} />
+            <Route path="/gpio" element={<GPIO />} />
           </Routes>
         </main>
       </div>

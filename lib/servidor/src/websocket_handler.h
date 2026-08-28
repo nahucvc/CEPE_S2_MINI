@@ -8,6 +8,7 @@
 #include "PWM.h"
 #include "ADC.h"
 #include "DAC.h"
+#include "ControladorGpio.h"
 
 // Variables externas (definidas en servidor.cpp)
 extern AsyncWebSocket ws;
@@ -40,17 +41,28 @@ extern bool dacEncendido;
 extern uint8_t dacPin;
 extern uint8_t dacValor;
 
+// Estado del GPIO
+extern ControladorGpio gpio;
+extern uint8_t gpioEntradas[4];
+extern ModoEntrada gpioModos[4];
+extern uint8_t gpioSalidas[4];
+extern bool gpioEstadosSalida[4];
+extern bool gpioEntradasConfiguradas[4];
+extern bool gpioSalidasConfiguradas[4];
+
 // Funciones de envío de estado
 void enviarEstadoLed();
 void enviarEstadoPwm();
 void enviarEstadoAdc();
 void enviarLecturaAdc();
 void enviarEstadoDac();
+void enviarEstadoGpio();
 
 // Funciones de procesamiento de comandos
 void procesarComandoPwm(JsonObject comando);
 void procesarComandoAdc(JsonObject comando);
 void procesarComandoDac(JsonObject comando);
+void procesarComandoGpio(JsonObject comando);
 
 // Función principal de eventos WebSocket
 void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEventType evento, void *arg, uint8_t *datos, size_t len);

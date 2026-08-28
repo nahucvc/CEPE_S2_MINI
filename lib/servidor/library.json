@@ -1,0 +1,20 @@
+{
+  "name": "servidor",
+  "version": "1.0.0",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": [
+    {
+      "name": "PWM"
+    },
+    {
+      "name": "ADC"
+    },
+    {
+      "name": "DAC"
+    },
+    {
+      "name": "GPIO"
+    }
+  ]
+}

@@ -57,6 +57,39 @@ void enviarEstadoDac()
     ws.textAll(salida);
 }
 
+// Función para enviar el estado del GPIO a todos los clientes conectados
+void enviarEstadoGpio()
+{
+    StaticJsonDocument<512> doc;
+    doc["tipo"] = "gpio";
+
+    // Entradas
+    JsonArray entradas = doc.createNestedArray("entradas");
+    for (int i = 0; i < 4; i++)
+    {
+        JsonObject entrada = entradas.createNestedObject();
+        entrada["pin"] = gpioEntradas[i];
+        entrada["modo"] = (int)gpioModos[i];
+        entrada["configurado"] = gpioEntradasConfiguradas[i];
+        entrada["valor"] = gpioEntradasConfiguradas[i] ? gpio.leerEntrada(gpioEntradas[i]) : false;
+    }
+
+    // Salidas
+    JsonArray salidas = doc.createNestedArray("salidas");
+    for (int i = 0; i < 4; i++)
+    {
+        JsonObject salida = salidas.createNestedObject();
+        salida["pin"] = gpioSalidas[i];
+        salida["configurado"] = gpioSalidasConfiguradas[i];
+        salida["estado"] = gpioEstadosSalida[i];
+    }
+
+    String salida;
+    serializeJson(doc, salida);
+    Serial.printf("[GPIO ESP32] Enviando estado: %s\n", salida.c_str());
+    ws.textAll(salida);
+}
+
 // Función para enviar la lectura del ADC a todos los clientes conectados
 void enviarLecturaAdc()
 {
@@ -263,6 +296,78 @@ void procesarComandoDac(JsonObject comando)
     enviarEstadoDac();
 }
 
+// Procesar comandos GPIO recibidos por WebSocket
+void procesarComandoGpio(JsonObject comando)
+{
+    const char *accion = comando["accion"] | "";
+    Serial.printf("[GPIO ESP32] Comando GPIO recibido, accion=%s\n", accion);
+
+    if (strcmp(accion, "configurar_entrada") == 0)
+    {
+        int indice = comando["indice"] | -1;
+        uint8_t pin = comando["pin"] | 0;
+        int modo = comando["modo"] | (int)ENTRADA_FLOTANTE;
+
+        if (indice < 0 || indice >= 4)
+        {
+            Serial.printf("[GPIO ESP32] ERROR: índice de entrada inválido: %d\n", indice);
+            return;
+        }
+
+        gpioEntradas[indice] = pin;
+        gpioModos[indice] = (ModoEntrada)modo;
+        gpioEntradasConfiguradas[indice] = gpio.configurarEntrada(pin, (ModoEntrada)modo);
+        Serial.printf("[GPIO ESP32] Configurar entrada %d: pin=%u modo=%d ok=%d\n",
+                      indice, pin, modo, gpioEntradasConfiguradas[indice]);
+    }
+    else if (strcmp(accion, "configurar_salida") == 0)
+    {
+        int indice = comando["indice"] | -1;
+        uint8_t pin = comando["pin"] | 0;
+
+        if (indice < 0 || indice >= 4)
+        {
+            Serial.printf("[GPIO ESP32] ERROR: índice de salida inválido: %d\n", indice);
+            return;
+        }
+
+        gpioSalidas[indice] = pin;
+        gpioSalidasConfiguradas[indice] = gpio.configurarSalida(pin);
+        gpioEstadosSalida[indice] = false;
+        Serial.printf("[GPIO ESP32] Configurar salida %d: pin=%u ok=%d\n",
+                      indice, pin, gpioSalidasConfiguradas[indice]);
+    }
+    else if (strcmp(accion, "escribir_salida") == 0)
+    {
+        int indice = comando["indice"] | -1;
+        bool estado = comando["estado"] | false;
+
+        if (indice < 0 || indice >= 4)
+        {
+            Serial.printf("[GPIO ESP32] ERROR: índice de salida inválido: %d\n", indice);
+            return;
+        }
+
+        if (!gpioSalidasConfiguradas[indice])
+        {
+            Serial.printf("[GPIO ESP32] ERROR: salida %d no configurada\n", indice);
+            return;
+        }
+
+        gpioEstadosSalida[indice] = estado;
+        gpio.escribirSalida(gpioSalidas[indice], estado);
+        Serial.printf("[GPIO ESP32] Escribir salida %d: pin=%u estado=%d\n",
+                      indice, gpioSalidas[indice], estado);
+    }
+    else
+    {
+        Serial.printf("[GPIO ESP32] Acción desconocida: %s\n", accion);
+        return;
+    }
+
+    enviarEstadoGpio();
+}
+
 // Función principal que maneja los eventos del WebSocket
 void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEventType evento, void *arg, uint8_t *datos, size_t len)
 {
@@ -319,6 +424,10 @@ void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEv
         else if (strcmp(periferico, "dac") == 0)
         {
             procesarComandoDac(doc.as<JsonObject>());
+        }
+        else if (strcmp(periferico, "gpio") == 0)
+        {
+            procesarComandoGpio(doc.as<JsonObject>());
         }
         return;
     }

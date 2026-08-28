@@ -324,3 +324,128 @@ body {
   border-bottom: 1px solid #3a3d4d;
   padding-bottom: 0.6rem;
 }
+
+/* ====== Layout GPIO ====== */
+.grid-gpio {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.panel-gpio {
+  max-width: none;
+  width: 100%;
+}
+
+.panel-gpio h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #f2f2f2;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #3a3d4d;
+  padding-bottom: 0.6rem;
+}
+
+.panel-descripcion {
+  font-size: 0.85rem;
+  color: #8a8d9a;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+/* Fila de cada pin GPIO */
+.gpio-fila {
+  background: #1e1f26;
+  border: 1px solid #3a3d4d;
+  border-radius: 8px;
+  padding: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.gpio-fila-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+}
+
+.gpio-etiqueta {
+  font-weight: bold;
+  color: #f2f2f2;
+  font-size: 0.95rem;
+}
+
+.gpio-estado {
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  background: #2b2d3a;
+  color: #8a8d9a;
+}
+
+.gpio-estado.activo {
+  background: #1e3a2e;
+  color: #2ecc71;
+}
+
+/* Indicador LED del estado de cada pin */
+.gpio-indicador-grupo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gpio-led {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #3a3d4d;
+  background: #2b2d3a;
+  flex-shrink: 0;
+}
+
+.gpio-led.led-on {
+  background: #2ecc71;
+  border-color: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.7);
+}
+
+.gpio-led.led-off {
+  background: #e74c3c;
+  border-color: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+}
+
+.gpio-led.led-sin-configurar {
+  background: #2b2d3a;
+  border-color: #3a3d4d;
+}
+
+.gpio-fila-controles {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.gpio-campo-pin {
+  flex: 1;
+  min-width: 90px;
+}
+
+.gpio-campo-modo {
+  flex: 1.4;
+  min-width: 120px;
+}
+
+.gpio-btn-configurar {
+  flex: 0 0 auto;
+  min-width: 90px;
+}
+
+.gpio-btn-toggle {
+  flex: 0 0 auto;
+  min-width: 100px;
+}
