@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ControlPwm from "../componentes/pwm/ControlPwm";
+import ModulacionPwm from "../componentes/pwm/ModulacionPwm";
 
 type EstadoPwm = {
   encendido: boolean;
@@ -247,6 +249,14 @@ function PWM() {
     setModulacion((prev) => ({ ...prev, activa: false }));
   };
 
+  const cambiarEstado = (nuevo: Partial<EstadoPwm>) => {
+    setEstado((prev) => ({ ...prev, ...nuevo }));
+  };
+
+  const cambiarModulacion = (nuevo: Partial<typeof modulacion>) => {
+    setModulacion((prev) => ({ ...prev, ...nuevo }));
+  };
+
   return (
     <div className="pagina">
       <h2>Control PWM</h2>
@@ -254,147 +264,23 @@ function PWM() {
         {conectado ? "Conectado" : "Reconectando..."}
       </p>
 
-      <div className="panel">
-        <div className="campo">
-          <label htmlFor="pin">Pin de salida</label>
-          <input
-            id="pin"
-            type="number"
-            min={0}
-            max={48}
-            value={estado.pin}
-            onChange={(e) =>
-              setEstado((prev) => ({ ...prev, pin: Number(e.target.value) }))
-            }
-          />
-        </div>
+      <div className="grid-pwm">
+        <ControlPwm
+          estado={estado}
+          modulacionActiva={modulacion.activa}
+          onCambiarEstado={cambiarEstado}
+          onAplicarConfiguracion={aplicarConfiguracion}
+          onCambiarDuty={cambiarDuty}
+          onAlternar={alternar}
+        />
 
-        <div className="campo">
-          <label htmlFor="frecuencia">Frecuencia (Hz)</label>
-          <input
-            id="frecuencia"
-            type="number"
-            min={1}
-            value={estado.frecuencia}
-            onChange={(e) =>
-              setEstado((prev) => ({
-                ...prev,
-                frecuencia: Number(e.target.value),
-              }))
-            }
-          />
-        </div>
-
-        <div className="campo">
-          <label htmlFor="resolucion">Resolución (bits)</label>
-          <input
-            id="resolucion"
-            type="number"
-            min={1}
-            max={16}
-            value={estado.resolucion}
-            onChange={(e) =>
-              setEstado((prev) => ({
-                ...prev,
-                resolucion: Number(e.target.value),
-              }))
-            }
-          />
-        </div>
-
-        <button className="btn btn-configurar" onClick={aplicarConfiguracion}>
-          Aplicar configuración
-        </button>
-
-        <div className="campo">
-          <label htmlFor="duty">
-            Duty: {estado.duty} / {estado.maximo}
-          </label>
-          <input
-            id="duty"
-            type="range"
-            min={0}
-            max={estado.maximo}
-            value={estado.duty}
-            onChange={(e) => cambiarDuty(Number(e.target.value))}
-          />
-        </div>
-
-        <button
-          className={`btn ${estado.encendido ? "btn-off" : "btn-on"}`}
-          onClick={alternar}
-          disabled={modulacion.activa}
-        >
-          {estado.encendido ? "Apagar" : "Encender"}
-        </button>
-      </div>
-
-      <h3>Modulación de señal</h3>
-      <div className="panel">
-        <div className="campo">
-          <label htmlFor="frecuenciaSenal">
-            Frecuencia de la señal a generar (Hz)
-          </label>
-          <input
-            id="frecuenciaSenal"
-            type="number"
-            min={1}
-            max={10000}
-            value={modulacion.frecuenciaSenal}
-            onChange={(e) =>
-              setModulacion((prev) => ({
-                ...prev,
-                frecuenciaSenal: Number(e.target.value),
-              }))
-            }
-          />
-          <small>
-            El PWM cambiará a {modulacion.frecuenciaSenal * 100} Hz
-            (ts = {calcularTs()} µs)
-          </small>
-        </div>
-
-        <div className="campo">
-          <label htmlFor="frecuenciaPortadora">Frecuencia portadora PWM (Hz)</label>
-          <input
-            id="frecuenciaPortadora"
-            type="number"
-            min={1000}
-            value={modulacion.frecuenciaPortadora}
-            onChange={(e) =>
-              setModulacion((prev) => ({
-                ...prev,
-                frecuenciaPortadora: Number(e.target.value),
-              }))
-            }
-          />
-        </div>
-
-        <div className="campo">
-          <label htmlFor="tipoOnda">Tipo de onda</label>
-          <select
-            id="tipoOnda"
-            value={modulacion.tipoOnda}
-            onChange={(e) =>
-              setModulacion((prev) => ({
-                ...prev,
-                tipoOnda: e.target.value as TipoOnda,
-              }))
-            }
-          >
-            <option value="senoidal">Senoidal</option>
-            <option value="cuadrada">Cuadrada</option>
-            <option value="triangular">Triangular</option>
-            <option value="sierra">Sierra</option>
-          </select>
-        </div>
-
-        <button
-          className={`btn ${modulacion.activa ? "btn-off" : "btn-configurar"}`}
-          onClick={modulacion.activa ? detenerModulacion : iniciarModulacion}
-        >
-          {modulacion.activa ? "Detener modulación" : "Iniciar modulación"}
-        </button>
+        <ModulacionPwm
+          modulacion={modulacion}
+          ts={calcularTs()}
+          onCambiarModulacion={cambiarModulacion}
+          onIniciar={iniciarModulacion}
+          onDetener={detenerModulacion}
+        />
       </div>
     </div>
   );

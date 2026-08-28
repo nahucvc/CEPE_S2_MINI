@@ -278,3 +278,27 @@ body {
   color: #8a8d9a;
   text-align: center;
 }
+
+/* ====== Layout PWM ====== */
+.grid-pwm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.panel-pwm,
+.panel-modulacion {
+  max-width: none;
+  width: 100%;
+}
+
+.panel-pwm h3,
+.panel-modulacion h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #f2f2f2;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #3a3d4d;
+  padding-bottom: 0.6rem;
+}
