@@ -2,6 +2,7 @@
 #include "websocket_handler.h"
 #include "PWM.h"
 #include "ADC.h"
+#include "DAC.h"
 
 AsyncWebServer server(80); // creacion del servidor
 AsyncWebSocket ws("/ws");
@@ -28,6 +29,12 @@ uint8_t adcResolucion = 12;  // 9-12 bits
 uint32_t adcFrecuenciaEnvio = 100;  // Hz
 uint64_t adcUltimoEnvio = 0;
 uint32_t adcPeriodoEnvioUs = 10000;  // microsegundos
+
+// Estado del DAC
+DAC dac;
+bool dacEncendido = false;
+uint8_t dacPin = 17;          // GPIO17 = DAC1
+uint8_t dacValor = 0;
 
 void notFound(AsyncWebServerRequest *request)
 {

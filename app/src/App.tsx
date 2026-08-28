@@ -4,6 +4,7 @@ import MenuLateral from "./componentes/MenuLateral";
 import Inicio from "./paginas/Inicio";
 import PWM from "./paginas/PWM";
 import ADC from "./paginas/ADC";
+import DAC from "./paginas/DAC";
 import "./App.css";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
             <Route path="/" element={<Inicio />} />
             <Route path="/pwm" element={<PWM />} />
             <Route path="/adc" element={<ADC />} />
+            <Route path="/dac" element={<DAC />} />
           </Routes>
         </main>
       </div>

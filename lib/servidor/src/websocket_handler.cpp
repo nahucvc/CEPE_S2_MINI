@@ -41,6 +41,22 @@ void enviarEstadoAdc()
     ws.textAll(salida);
 }
 
+// Función para enviar el estado del DAC a todos los clientes conectados
+void enviarEstadoDac()
+{
+    StaticJsonDocument<128> doc;
+    doc["tipo"] = "dac";
+    doc["encendido"] = dacEncendido;
+    doc["pin"] = dacPin;
+    doc["valor"] = dacValor;
+    doc["maximo"] = dac.obtenerMaximo();
+
+    String salida;
+    serializeJson(doc, salida);
+    Serial.printf("[DAC ESP32] Enviando estado: %s\n", salida.c_str());
+    ws.textAll(salida);
+}
+
 // Función para enviar la lectura del ADC a todos los clientes conectados
 void enviarLecturaAdc()
 {
@@ -199,6 +215,54 @@ void procesarComandoAdc(JsonObject comando)
     enviarEstadoAdc();
 }
 
+// Procesar comandos DAC recibidos por WebSocket
+void procesarComandoDac(JsonObject comando)
+{
+    const char *accion = comando["accion"] | "";
+    Serial.printf("[DAC ESP32] Comando DAC recibido, accion=%s\n", accion);
+
+    if (strcmp(accion, "configurar") == 0)
+    {
+        dacPin = comando["pin"] | dacPin;
+        Serial.printf("[DAC ESP32] Configurar: pin=%u\n", dacPin);
+        if (!dac.configurar(dacPin))
+        {
+            Serial.printf("[DAC ESP32] ERROR: pin %u no es un pin DAC válido (17 o 18)\n", dacPin);
+            return;
+        }
+        dacValor = 0;
+        dacEncendido = false;
+    }
+    else if (strcmp(accion, "valor") == 0)
+    {
+        dacValor = comando["valor"] | dacValor;
+        Serial.printf("[DAC ESP32] Valor: %u (encendido=%d)\n", dacValor, dacEncendido);
+        if (dacEncendido)
+        {
+            dac.escribir(dacValor);
+        }
+    }
+    else if (strcmp(accion, "encender") == 0)
+    {
+        Serial.println("[DAC ESP32] Encender");
+        dacEncendido = true;
+        dac.escribir(dacValor);
+    }
+    else if (strcmp(accion, "apagar") == 0)
+    {
+        Serial.println("[DAC ESP32] Apagar");
+        dacEncendido = false;
+        dac.escribir(0);
+    }
+    else
+    {
+        Serial.printf("[DAC ESP32] Acción desconocida: %s\n", accion);
+        return;
+    }
+
+    enviarEstadoDac();
+}
+
 // Función principal que maneja los eventos del WebSocket
 void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEventType evento, void *arg, uint8_t *datos, size_t len)
 {
@@ -251,6 +315,10 @@ void EventosSockets(AsyncWebSocket *server, AsyncWebSocketClient *cliente, AwsEv
         else if (strcmp(periferico, "adc") == 0)
         {
             procesarComandoAdc(doc.as<JsonObject>());
+        }
+        else if (strcmp(periferico, "dac") == 0)
+        {
+            procesarComandoDac(doc.as<JsonObject>());
         }
         return;
     }

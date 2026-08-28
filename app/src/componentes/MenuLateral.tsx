@@ -4,7 +4,6 @@ import { NavLink } from "react-router-dom";
 // cuando se creen las funciones y botones correspondientes.
 const perifericos = [
   { ruta: "/", etiqueta: "Inicio" },
-  { ruta: "/led", etiqueta: "LED" },
   { ruta: "/pwm", etiqueta: "PWM" },
   { ruta: "/adc", etiqueta: "ADC" },
   { ruta: "/dac", etiqueta: "DAC" },
