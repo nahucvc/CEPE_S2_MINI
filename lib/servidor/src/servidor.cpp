@@ -79,6 +79,16 @@ void IniciarServidor(void)
     server.on("^\\/(.*)$", HTTP_GET, [](AsyncWebServerRequest *request)
               {
                   String ruta = "/" + request->pathArg(0);
+
+                  // Si el archivo no existe en SPIFFS, es una ruta del SPA
+                  // (p.ej. /gpio, /pwm, /adc). Se devuelve index.html para
+                  // que React Router maneje la navegación.
+                  if (!SPIFFS.exists(ruta))
+                  {
+                      request->send(SPIFFS, "/index.html", "text/html");
+                      return;
+                  }
+
                   String tipo = "application/octet-stream";
                   if (ruta.endsWith(".html"))
                   {
